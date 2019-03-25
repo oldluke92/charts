@@ -1,0 +1,117 @@
+# Default values for mongodb-sharded.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 3
+
+clusterName: cluster.local
+
+auth:
+  enabled: false
+  # key: "thisisasupersecretmongosecret"
+
+image:
+  repository: mongo
+  tag: 3.6
+  pullPolicy: IfNotPresent
+
+service:
+  type: NodePort
+  port: 27017
+  nodePort: 30300
+
+resources: {}
+# limits:
+#   cpu: 500m
+#   memory: 512Mi
+# requests:
+#   cpu: 100m
+#   memory: 256Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+podAnnotations: {}
+
+# Readiness probe
+readinessProbe:
+  initialDelaySeconds: 5
+  timeoutSeconds: 1
+  failureThreshold: 3
+  periodSeconds: 10
+  successThreshold: 1
+
+# Liveness probe
+livenessProbe:
+  initialDelaySeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+  periodSeconds: 10
+  successThreshold: 1
+
+mongodb-replicaset-configdb:
+  replicas: 3
+  replicaSetName: config0
+  auth:
+    enabled: false
+    ## beware! This will be THE cluster admin account later.
+    # adminUser: admin
+    # adminPassword: secretpassword
+    ## This is exemplary for the key secret if your release is named "mongodb-sharded".
+    ## If your release is named "mongodb-sharded" it would be mongodb-sharded-keyfile
+    ## Elseways it would be [ReleaseName]-mongodb-sharded-keyfile
+    # existingKeySecret: mongodb-sharded-keyfile
+  configmap:
+    replication:
+      replSetName: config0
+    sharding:
+      clusterRole: configsvr
+  persistentVolume:
+    enabled: true
+    #storageClass: "standard"
+    accessModes:
+        - ReadWriteOnce
+    size: 10Gi
+    annotations: {}
+
+mongodb-replicaset-shard0:
+  replicas: 3
+  replicaSetName: shard0
+  auth:
+    enabled: false
+    ## This can (and should) be different from the Cluster-Admin account and can used on the single shard only
+    ## It can also be different for different shards
+    # adminUser: admin
+    # adminPassword: secretpassword
+    ## This is exemplary for the key secret if your release is named "mongodb-sharded".
+    ## If your release is named "mongodb-sharded" it would be mongodb-sharded-keyfile
+    ## Elseways it would be [ReleaseName]-mongodb-sharded-keyfile
+    # existingKeySecret: mongodb-sharded-keyfile
+    # metricsUser: metrics
+    # metricsPassword: secretmetricspassword
+  configmap:
+    replication:
+      replSetName: shard0
+    sharding:
+      clusterRole: shardsvr
+  persistentVolume:
+    enabled: true
+    #storageClass: "standard"
+    accessModes:
+        - ReadWriteOnce
+    size: 10Gi
+    annotations: {}
+  metrics:
+    enabled: true
+    image:
+      repository: ssalaues/mongodb-exporter
+      tag: 0.6.1
+      pullPolicy: IfNotPresent
+    port: 9216
+    path: "/metrics"
+    socketTimeout: 3s
+    syncTimeout: 1m
+    prometheusServiceDiscovery: true

@@ -1,0 +1,9 @@
+dependencies:
+  - name: mongodb-replicaset
+    version: "3.9.0"
+    repository: "@stable"
+    alias: mongodb-replicaset-configdb
+  - name: mongodb-replicaset
+    version: "3.9.0"
+    repository: "@stable"
+    alias: mongodb-replicaset-shard0

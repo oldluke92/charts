@@ -1,0 +1,89 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: {{ template "mongodb-sharded.fullname" . }}
+  labels:
+    app: {{ template "mongodb-sharded.name" . }}
+    chart: {{ template "mongodb-sharded.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ template "mongodb-sharded.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "mongodb-sharded.name" . }}
+        release: {{ .Release.Name }}
+{{- if .Values.podAnnotations }}
+      annotations:
+{{ toYaml .Values.podAnnotations | indent 8 }}
+{{- end }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: mongodb
+              containerPort: 27017
+          livenessProbe:
+            exec:
+              command:
+                - mongo
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            successThreshold: {{ .Values.livenessProbe.successThreshold }}
+          readinessProbe:
+            exec:
+              command:
+                - mongo
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            successThreshold: {{ .Values.readinessProbe.successThreshold }}
+          command:
+            - mongos
+            - --configdb=config0/{{ .Release.Name }}-mongodb-replicaset-configdb-0.{{ .Release.Name }}-mongodb-replicaset-configdb:27017{{ if eq .Values.replicaCount 3.0 }},{{ .Release.Name }}-mongodb-replicaset-configdb-1.{{ .Release.Name }}-mongodb-replicaset-configdb:27017,{{ .Release.Name }}-mongodb-replicaset-configdb-2.{{ .Release.Name }}-mongodb-replicaset-configdb:27017{{ end }}
+            - --port=27017
+            - --bind_ip=0.0.0.0
+          {{- if .Values.auth.enabled }}
+            - --keyFile=/data/key.txt
+          {{- end }}
+          {{- if .Values.auth.enabled }}
+          volumeMounts:
+            - name: keyfile
+              mountPath: /data/key.txt
+              subPath: key.txt
+          {{- end }}
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+      {{- if .Values.auth.enabled }}
+      volumes:
+        - name: keyfile
+          secret:
+            defaultMode: 0400
+            secretName: {{ template "mongodb-sharded.keySecret" . }}
+      {{- end }}
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}

@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "mongodb-sharded.fullname" . }}
+  labels:
+    app: {{ template "mongodb-sharded.name" . }}
+    chart: {{ template "mongodb-sharded.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: mongodb
+      {{ if eq .Values.service.type "NodePort" }}nodePort: {{ .Values.service.nodePort }}{{ end }}
+  selector:
+    app: {{ template "mongodb-sharded.name" . }}
+    release: {{ .Release.Name }}

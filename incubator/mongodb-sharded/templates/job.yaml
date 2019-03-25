@@ -1,0 +1,54 @@
+{{- if .Release.IsInstall }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-add-mongodb-shards
+  labels:
+    app: {{ template "mongodb-sharded.name" . }}
+    chart: {{ template "mongodb-sharded.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  backoffLimit: 10
+  template:
+    spec:
+      containers:
+      - name: mongoclient
+        image: mongo:3.6
+      {{- if .Values.auth.enabled }}
+        env:
+        - name: ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              name: "{{ template "mongodb-sharded.adminSecret" . }}"
+              key: user
+        - name: ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: "{{ template "mongodb-sharded.adminSecret" . }}"
+              key: password
+      {{- end }}
+        command:
+          - "/bin/bash"
+          - "-c"
+          - "result=$(
+            mongo
+              {{- if .Values.auth.enabled }}
+                --username $ADMIN_USER
+                --authenticationDatabase admin
+                --password $ADMIN_PASSWORD
+              {{- end }}
+                --host {{ template "mongodb-sharded.fullname" . }}
+                --eval 'sh.addShard(\
+                  \"shard0/{{ .Release.Name }}-mongodb-replicaset-shard0-0.{{ .Release.Name }}-mongodb-replicaset-shard0.{{ .Release.Namespace }}.svc.{{ .Values.clusterName }}:27017\
+                  {{ if eq .Values.replicaCount 3.0 }},\
+                  {{ .Release.Name }}-mongodb-replicaset-shard0-1.{{ .Release.Name }}-mongodb-replicaset-shard0.{{ .Release.Namespace }}.svc.{{ .Values.clusterName }}:27017,\
+                  {{ .Release.Name }}-mongodb-replicaset-shard0-2.{{ .Release.Name }}-mongodb-replicaset-shard0.{{ .Release.Namespace }}.svc.{{ .Values.clusterName }}:27017\
+                  {{ end }}\
+                \");'
+            );
+            echo $result;
+            if [[ $result = *\"\\\"ok\\\" : 1\"* ]]; then exit 0; fi;
+            exit 2;"
+      restartPolicy: OnFailure
+{{- end }}
